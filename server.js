@@ -4,12 +4,12 @@ import User from "./model.js";
 import 'dotenv/config'
 import cors from "cors";
 import bodyParser from "body-parser";
+import Serverless from "serverless-http";
 
 const app = express();
 app.use(express.json());
 app.use(cors({ origin: "*", credentials: true, }));
 app.use(bodyParser.json());
-
 
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('MongoDB connected'))
@@ -40,3 +40,5 @@ app.post('/api/users', async (req, res) => {
 app.listen(5000, () => {
   console.log("server is running on 5000");
 });
+
+export const handler = Serverless(app);
