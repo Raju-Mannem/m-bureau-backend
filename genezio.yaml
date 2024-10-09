@@ -2,7 +2,7 @@ frontend:
     path: ./
     publish: ""
     scripts:
-        build: npm run build
+        build: npm run start
         deploy: npm install
     subdomain: m-bureau-backend
 name: m-bureau-backend
