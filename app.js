@@ -25,6 +25,7 @@ app.post('/api/users', auth, async (req, res) => {
     let user = await User.findOne({ googleId });
     if (!user) {
       user = await new User({ email, googleId }).save();
+
     }
     res.json({ user });
   } catch (error) {
@@ -126,7 +127,6 @@ app.post('/api/profiles', async (req, res) => {
     await profile.save();
     res.status(201).json(profile);
   } catch (error) {
-    console.error("Error creating profile:", error);
     res.status(500).send({ error: error.message || "An error occurred" });
   }
 });
