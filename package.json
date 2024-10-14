@@ -2,11 +2,11 @@
   "name": "m-bureau-backend",
   "version": "1.0.0",
   "description": "marriage bureau app nodejs backend",
-  "main": "server.js",
+  "main": "app.js",
   "type": "module",
   "scripts": {
-    "start": "node server",
-    "server": "nodemon server"
+    "start": "node app",
+    "server": "nodemon app"
   },
   "keywords": [],
   "author": "",
@@ -16,13 +16,19 @@
     "body-parser": "^1.20.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "express": "^4.19.2",
+    "express": "^4.21.0",
+    "firebase-admin": "^12.6.0",
     "google-auth-library": "^9.14.1",
+    "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.3.3"
+    "mongoose": "^8.3.3",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
+    "nodemon": "^3.1.7",
+    "serverless-http": "^3.2.0",
+    "uuid": "^10.0.0"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2",
-    "nodemon": "^3.1.0"
+    "concurrently": "^8.2.2"
   }
 }
