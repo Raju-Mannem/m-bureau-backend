@@ -17,16 +17,24 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
+<<<<<<< HEAD
     "firebase-admin": "^12.6.0",
+=======
+>>>>>>> e7622aa3b3509783c8beb741bfa97fc023053f61
     "google-auth-library": "^9.14.1",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.3.3",
+<<<<<<< HEAD
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
     "nodemon": "^3.1.7",
     "serverless-http": "^3.2.0",
     "uuid": "^10.0.0"
+=======
+    "nodemon": "^3.1.7",
+    "serverless-http": "^3.2.0"
+>>>>>>> e7622aa3b3509783c8beb741bfa97fc023053f61
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

@@ -9,10 +9,15 @@ const adminSchema = new mongoose.Schema({
   adminName: { type: String, required: true },
   password: { type: String, required: true },
 });
+<<<<<<< HEAD
+=======
+
+>>>>>>> e7622aa3b3509783c8beb741bfa97fc023053f61
 const profileSchema = new mongoose.Schema({
   fullName: { type: String, required: true },
   fatherName: { type: String, required: true },
   motherName: { type: String, required: true },
+<<<<<<< HEAD
   mobile: { type: Number, required: true, unique: true },
   age: { type: Number, required: true },
   occupation: { type: String, required: true },
@@ -24,6 +29,19 @@ const profileSchema = new mongoose.Schema({
   photo2: { type: String},
   height: { type: String, required: true },
   message: { type: String }
+=======
+  mobile: { type: String, required: true },
+  age: { type: Number, required: true },
+  occupation: { type: String, required: true },
+  experience: { type: String, required: true },
+  salary: { type: Number, required: true },
+  currentAddress: { type: String, required: true },
+  permanentAddress: { type: String, required: true },
+  photo1: { type: String, required: true },
+  photo2: { type: String, required: true }, 
+  height: { type: String, required: true },
+  message: { type: String, required: false },
+>>>>>>> e7622aa3b3509783c8beb741bfa97fc023053f61
 });
 
 const User = mongoose.model("user", userSchema);
