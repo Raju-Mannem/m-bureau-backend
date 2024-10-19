@@ -10,11 +10,13 @@ import multer from "multer";
 import admin from "firebase-admin";
 import helmet from "helmet";
 import morgan from "morgan";
-import {v4 as uuid} from 'uuid';
+import { v4 as uuid } from "uuid";
 
 admin.initializeApp({
-  credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)),
-  storageBucket: process.env.FIREBASE_STORAGE_BUCKET
+  credential: admin.credential.cert(
+    JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+  ),
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
 });
 
 const bucket = admin.storage().bucket();
@@ -24,7 +26,7 @@ app.use(cors({ origin: "*" }));
 app.use(helmet());
 app.use(bodyParser.json({ limit: "10mb" }));
 app.use(bodyParser.urlencoded({ limit: "10mb", extended: true }));
-app.use(morgan('combined'));
+app.use(morgan("combined"));
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
@@ -122,7 +124,19 @@ app.post(
       } = req.body;
 
       // Validate required fields
-      if (!fullName || !fatherName || !motherName || !mobile || !age || !occupation || !experience || !salary || !currentAddress || !permanentAddress || !height) {
+      if (
+        !fullName ||
+        !fatherName ||
+        !motherName ||
+        !mobile ||
+        !age ||
+        !occupation ||
+        !experience ||
+        !salary ||
+        !currentAddress ||
+        !permanentAddress ||
+        !height
+      ) {
         return res.status(400).send({ error: "All fields are required" });
       }
 
@@ -134,17 +148,19 @@ app.post(
       }
 
       const uploadFile = (file) => {
-        const blob = bucket.file(uuid() + '-' + file.originalname);
+        const blob = bucket.file(uuid() + "-" + file.originalname);
         const blobStream = blob.createWriteStream({
           metadata: {
-            contentType: file.mimetype
-          }
+            contentType: file.mimetype,
+          },
         });
 
         return new Promise((resolve, reject) => {
-          blobStream.on('error', reject);
-          blobStream.on('finish', async () => {
-            const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(blob.name)}?alt=media`;
+          blobStream.on("error", reject);
+          blobStream.on("finish", async () => {
+            const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${
+              bucket.name
+            }/o/${encodeURIComponent(blob.name)}?alt=media`;
             resolve(publicUrl);
           });
           blobStream.end(file.buffer);
@@ -174,20 +190,28 @@ app.post(
       await profile.save();
       res.status(201).send({ message: "Profile uploaded successfully" });
     } catch (error) {
-      res.status(500).send({ error: error.message || "An error occurred while uploading the profile" });
+      res
+        .status(500)
+        .send({
+          error:
+            error.message || "An error occurred while uploading the profile",
+        });
     }
   }
 );
 
 app.get("/api/profiles", async (req, res) => {
   try {
-    const profiles = await Profiles.find({}, { fullName: 1, age: 1, occupation: 1, currentAddress: 1 });
+    const profiles = await Profiles.find(
+      {},
+      { fullName: 1, age: 1, occupation: 1, currentAddress: 1 }
+    );
     res.status(200).json(profiles);
   } catch (error) {
     res.status(500).send({ error: error.message || "An error occurred" });
   }
 });
- 
+
 app.get("/api/profiles/:id", async (req, res) => {
   try {
     const profile = await Profiles.findById(req.params.id);
@@ -198,13 +222,27 @@ app.get("/api/profiles/:id", async (req, res) => {
 });
 
 app.delete("/api/profiles/:id", async (req, res) => {
-    try {
-      const profile = await Profiles.findByIdAndDelete(req.params.id);
-      res.status(200).json(profile);
-    } catch (error) {
-      res.status(500).send({ error: error.message || "An error occurred" });
-    }
-  });  
+  const userId = req.params.id;
+  try {
+    // Find and delete the user
+    const user = await Profiles.findByIdAndDelete(userId);
+    if (!user) return res.status(404).send("User not found");
+
+    // Delete images
+    const deleteImage = async (imageUrl) => {
+      const pathStartIndex = imageUrl.indexOf("/o/") + 3;
+      const pathEndIndex = imageUrl.indexOf("?");
+      const path = imageUrl.substring(pathStartIndex, pathEndIndex);
+      await bucket.file(decodeURIComponent(path)).delete();
+    };
+
+    await Promise.all([deleteImage(user.photo1), deleteImage(user.photo2)]);
+    res.status(200).send("User and images deleted");
+  } catch (error) {
+    console.log(error);
+    res.status(500).send({ error: error.message || "An error occurred" });
+  }
+});
 
 app.listen(5000, () => {
   console.log("server is running on 5000");
