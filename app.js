@@ -49,10 +49,12 @@ app.post("/api/users", auth, async (req, res) => {
       user = await new User({ email, googleId }).save();
     }
     if (user.access === true) {
-      profiles = await Profiles.find();
-    }
-    res.json({ user, profiles });
-  } catch (error) {
+      profiles = await Profiles.find({},
+        { fullName: 1, age: 1, occupation: 1, currentAddress: 1 }
+      );
+      res.status(200).json(profiles);
+  } 
+}catch (error) {
     res.status(400).send({ error: error.message || "An error occurred" });
   }
 });
