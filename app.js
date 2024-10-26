@@ -52,7 +52,7 @@ app.post("/api/users", auth, async (req, res) => {
       profiles = await Profiles.find({},
         { fullName: 1, age: 1, occupation: 1, currentAddress: 1 }
       );
-      res.status(200).json(profiles);
+      res.status(200).json({user,profiles});
   } 
 }catch (error) {
     res.status(400).send({ error: error.message || "An error occurred" });
