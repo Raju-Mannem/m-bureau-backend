@@ -125,7 +125,6 @@ app.post(
         message,
       } = req.body;
 
-      // Validate required fields
       if (
         !fullName ||
         !fatherName ||
