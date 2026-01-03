@@ -1,6 +1,6 @@
 import express from "express";
 import mongoose from "mongoose";
-import { Admin, User, Profiles } from "./model.js";
+import { Admin, User, Profiles, BioData } from "./model.js";
 import { auth } from "./middleware.js";
 import "dotenv/config";
 import cors from "cors";
@@ -52,9 +52,9 @@ app.post("/api/users", auth, async (req, res) => {
       profiles = await Profiles.find({},
         { fullName: 1, age: 1, occupation: 1, currentAddress: 1 }
       );
-      res.status(200).json({user,profiles});
-  } 
-}catch (error) {
+      res.status(200).json({ user, profiles });
+    }
+  } catch (error) {
     res.status(400).send({ error: error.message || "An error occurred" });
   }
 });
@@ -159,9 +159,8 @@ app.post(
         return new Promise((resolve, reject) => {
           blobStream.on("error", reject);
           blobStream.on("finish", async () => {
-            const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${
-              bucket.name
-            }/o/${encodeURIComponent(blob.name)}?alt=media`;
+            const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name
+              }/o/${encodeURIComponent(blob.name)}?alt=media`;
             resolve(publicUrl);
           });
           blobStream.end(file.buffer);
@@ -242,6 +241,279 @@ app.delete("/api/profiles/:id", async (req, res) => {
   } catch (error) {
     console.log(error);
     res.status(500).send({ error: error.message || "An error occurred" });
+  }
+});
+
+app.post("/api/ai/extract-bio-data", async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text) {
+      return res.status(400).json({ error: "Text is required" });
+    }
+
+    const GROQ_API_KEY = process.env.GROQ_API_KEY;
+    if (!GROQ_API_KEY) {
+      console.error("GROQ_API_KEY missing in backend");
+      return res.status(500).json({ error: "Server configuration error" });
+    }
+
+    const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
+
+    const response = await fetch(GROQ_API_URL, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${GROQ_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "llama-3.1-8b-instant",
+        temperature: 0.1,
+        max_tokens: 1024,
+        response_format: {
+          type: "json_object",
+        },
+        messages: [
+          {
+            role: "system",
+            content: `
+You extract bio-data from text into JSON.
+The JSON MUST have this exact structure:
+{
+  "items": [
+    { "label": "string", "value": "string" }
+  ]
+}
+
+Do not add extra keys.
+Do not wrap in markdown.
+Do not add explanations.
+            `.trim(),
+          },
+          {
+            role: "user",
+            content: `Extract bio-data from the following text:\n${text}`,
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error("Groq API Error:", response.status, errText);
+      throw new Error(`Groq API Error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    const output = result.choices?.[0]?.message?.content || "";
+
+    let parsedOutput;
+    try {
+      parsedOutput = JSON.parse(output);
+    } catch {
+      parsedOutput = { items: [], raw: output };
+    }
+    res.json(parsedOutput);
+
+  } catch (error) {
+    console.error("AI Proxy Error:", error);
+    res.status(500).json({
+      error: error.message || "An error occurred during AI processing",
+    });
+  }
+});
+
+
+
+// --- BioData Endpoints ---
+
+app.post(
+  "/api/biodata",
+  upload.single("image"), // Expect 'image' file
+  async (req, res) => {
+    try {
+      const { data, isMale } = req.body; // 'data' is JSON string of fields
+
+      const parsedData = JSON.parse(data);
+      const parsedIsMale = isMale === 'true' || isMale === true;
+
+      let imageUrl = null;
+      if (req.file) {
+        // Upload to Firebase
+        const blob = bucket.file(uuid() + "-" + req.file.originalname);
+        const blobStream = blob.createWriteStream({
+          metadata: {
+            contentType: req.file.mimetype,
+          },
+        });
+
+        await new Promise((resolve, reject) => {
+          blobStream.on("error", reject);
+          blobStream.on("finish", async () => {
+            const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name
+              }/o/${encodeURIComponent(blob.name)}?alt=media`;
+            imageUrl = publicUrl;
+            resolve();
+          });
+          blobStream.end(req.file.buffer);
+        });
+      }
+
+      // Extract Birth Year
+      let birthYear = null;
+      const dobField = parsedData.find(item =>
+        item.label.toLowerCase().includes("date of birth") ||
+        item.label.toLowerCase().includes("dob")
+      );
+
+      if (dobField && dobField.value) {
+        const yearMatch = dobField.value.match(/\b(19|20)\d{2}\b/);
+        if (yearMatch) {
+          birthYear = parseInt(yearMatch[0], 10);
+        }
+      }
+
+      const bioData = new BioData({
+        imageUrl,
+        data: parsedData,
+        birthYear,
+        isMale: parsedIsMale
+      });
+
+      await bioData.save();
+      res.status(201).json(bioData);
+
+    } catch (error) {
+      console.error("BioData Save Error:", error);
+      res.status(500).send({ error: error.message || "Failed to save BioData" });
+    }
+  }
+);
+
+app.put(
+  "/api/biodata/:id",
+  upload.single("image"),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { data, isMale } = req.body;
+
+      const parsedData = JSON.parse(data);
+      const parsedIsMale = isMale === 'true' || isMale === true;
+
+      // Find existing to handle image replacement
+      const existingBioData = await BioData.findById(id);
+      if (!existingBioData) return res.status(404).send({ error: "BioData not found" });
+
+      let imageUrl = existingBioData.imageUrl;
+
+      if (req.file) {
+        // Delete old image if exists
+        if (existingBioData.imageUrl) {
+          try {
+            const pathStartIndex = existingBioData.imageUrl.indexOf("/o/") + 3;
+            const pathEndIndex = existingBioData.imageUrl.indexOf("?");
+            const path = existingBioData.imageUrl.substring(pathStartIndex, pathEndIndex);
+            await bucket.file(decodeURIComponent(path)).delete();
+          } catch (e) { console.error("Error deleting old image", e); }
+        }
+
+        // Upload new image
+        const blob = bucket.file(uuid() + "-" + req.file.originalname);
+        const blobStream = blob.createWriteStream({
+          metadata: { contentType: req.file.mimetype },
+        });
+
+        await new Promise((resolve, reject) => {
+          blobStream.on("error", reject);
+          blobStream.on("finish", async () => {
+            const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(blob.name)}?alt=media`;
+            imageUrl = publicUrl;
+            resolve();
+          });
+          blobStream.end(req.file.buffer);
+        });
+      }
+
+      // Extract Birth Year (Re-calc)
+      let birthYear = existingBioData.birthYear;
+      const dobField = parsedData.find(item =>
+        item.label.toLowerCase().includes("date of birth") ||
+        item.label.toLowerCase().includes("dob")
+      );
+      if (dobField && dobField.value) {
+        const yearMatch = dobField.value.match(/\b(19|20)\d{2}\b/);
+        if (yearMatch) birthYear = parseInt(yearMatch[0], 10);
+      }
+
+      existingBioData.data = parsedData;
+      existingBioData.birthYear = birthYear;
+      existingBioData.isMale = parsedIsMale;
+      existingBioData.imageUrl = imageUrl;
+
+      await existingBioData.save();
+      res.status(200).json(existingBioData);
+
+    } catch (error) {
+      console.error("BioData Update Error:", error);
+      res.status(500).send({ error: error.message || "Failed to update BioData" });
+    }
+  }
+);
+
+app.delete("/api/biodata/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const bioData = await BioData.findById(id);
+    if (!bioData) return res.status(404).json({ error: "Not found" });
+
+    if (bioData.imageUrl) {
+      try {
+        const pathStartIndex = bioData.imageUrl.indexOf("/o/") + 3;
+        const pathEndIndex = bioData.imageUrl.indexOf("?");
+        const path = bioData.imageUrl.substring(pathStartIndex, pathEndIndex);
+        await bucket.file(decodeURIComponent(path)).delete();
+      } catch (e) { console.error("Error deleting image from Firebase", e); }
+    }
+
+    await BioData.findByIdAndDelete(id);
+    res.status(200).send({ message: "BioData deleted successfully" });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get("/api/biodata/years", async (req, res) => {
+  try {
+    const years = await BioData.distinct("birthYear");
+    // Filter out nulls and sort
+    const sortedYears = years.filter(y => y != null).sort((a, b) => a - b);
+    res.json(sortedYears);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get("/api/biodata", async (req, res) => {
+  try {
+    const { year } = req.query;
+    let query = {};
+    if (year) {
+      query.birthYear = parseInt(year);
+    }
+    const profiles = await BioData.find(query).sort({ createdAt: -1 });
+    res.json(profiles);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get("/api/biodata/:id", async (req, res) => {
+  try {
+    const profile = await BioData.findById(req.params.id);
+    if (!profile) return res.status(404).json({ error: "Not found" });
+    res.json(profile);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 

@@ -21,13 +21,26 @@ const profileSchema = new mongoose.Schema({
   salary: { type: String, required: true },
   currentAddress: { type: String, required: true },
   permanentAddress: { type: String, required: true },
-  photo1: { type: String},
-  photo2: { type: String},
+  photo1: { type: String },
+  photo2: { type: String },
   height: { type: String, required: true },
   message: { type: String }
+});
+
+const bioDataSchema = new mongoose.Schema({
+  imageUrl: { type: String }, // Firebase URL
+  data: [{
+    label: { type: String },
+    value: { type: String }
+  }], // Array of dynamic fields
+  birthYear: { type: Number, index: true }, // For filtering
+  isMale: { type: Boolean, default: true }, // Gender tracking
+  createdAt: { type: Date, default: Date.now }
 });
 
 const User = mongoose.model("user", userSchema);
 const Admin = mongoose.model("admins", adminSchema);
 const Profiles = mongoose.model("profiles", profileSchema);
-export { Admin, User, Profiles};
+const BioData = mongoose.model("biodatas", bioDataSchema);
+
+export { Admin, User, Profiles, BioData };
